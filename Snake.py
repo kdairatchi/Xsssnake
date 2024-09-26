@@ -1,0 +1,169 @@
+import os
+import subprocess
+import webbrowser
+
+# Colors for terminal output
+class Colors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+# Set an absolute path to save the report (adjust to your environment)
+report_path = os.path.join(os.path.expanduser("~"), 'vulnerability_report.txt')
+
+# Function to run XSStrike
+def run_xsstrike(url):
+    print(f"Running {Colors.OKBLUE}XSStrike{Colors.ENDC} on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['python3', 'xsstrike.py', '--crawl', '--url', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.OKBLUE}XSStrike Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to run BruteXSS
+def run_brutexss(url):
+    print(f"Running {Colors.OKGREEN}BruteXSS{Colors.ENDC} on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['brutexss', '-u', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.OKGREEN}BruteXSS Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to run XSSer
+def run_xsser(url):
+    print(f"Running {Colors.WARNING}XSSer{Colors.ENDC} on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['xsser', '--url', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.WARNING}XSSer Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to run Cyclops
+def run_cyclops(url):
+    print(f"Running {Colors.FAIL}Cyclops{Colors.ENDC} on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['cyclops', '--url', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.FAIL}Cyclops Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to run WhatWaf
+def run_whatwaf(url):
+    print(f"Running {Colors.HEADER}WhatWaf{Colors.ENDC} to detect WAF on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['whatwaf', '--url', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.HEADER}WhatWaf Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to run XWAF
+def run_xwaf(url):
+    print(f"Running {Colors.HEADER}XWAF{Colors.ENDC} to attempt WAF bypass on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['xwaf', '--url', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.HEADER}XWAF Bypass Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to run Nemesida WAF Bypass
+def run_nemesida_bypass(url):
+    print(f"Running {Colors.HEADER}Nemesida WAF Bypass{Colors.ENDC} on {url}")
+    with open(report_path, 'a') as report:
+        result = subprocess.run(['nemesida', '--url', url], stdout=subprocess.PIPE, text=True)
+        report.write(f"\n=== {Colors.HEADER}Nemesida WAF Bypass Results for {url}{Colors.ENDC} ===\n")
+        report.write(result.stdout)
+
+# Function to detect and bypass WAF if requested
+def detect_and_bypass_waf(url):
+    run_whatwaf(url)
+    bypass_waf = input("A WAF was detected. Would you like to attempt a bypass? (y/n): ").lower()
+    if bypass_waf == 'y':
+        run_xwaf(url)
+        run_nemesida_bypass(url)
+
+# Function for Google Dorking Recon
+def google_dork_recon(url):
+    dorks = [
+        f'site:{url} ext:php',
+        f'site:{url} ext:sql',
+        f'site:{url} inurl:admin',
+        f'site:{url} "php error"',
+        f'site:{url} intitle:"index of"',
+        f'site:{url} ext:xml',
+    ]
+    
+    for dork in dorks:
+        search_url = f"https://www.google.com/search?q={dork}"
+        print(f"Opening Google Dork search: {dork}")
+        webbrowser.open(search_url)
+
+# Function to run all tools on a single target
+def scan_target(url):
+    print(f"\n{Colors.BOLD}Scanning target: {url}{Colors.ENDC}")
+    run_xsstrike(url)
+    run_brutexss(url)
+    run_xsser(url)
+    run_cyclops(url)
+    detect_and_bypass_waf(url)
+    google_recon = input("Would you like to perform Google Dork Recon? (y/n): ").lower()
+    if google_recon == 'y':
+        google_dork_recon(url)
+    print(f"Completed scanning {url}. Report saved in {report_path}\n")
+
+# Function to handle scanning from a list
+def scan_from_list(file_path):
+    with open(file_path, 'r') as file:
+        urls = file.readlines()
+        for url in urls:
+            scan_target(url.strip())
+
+# Main execution logic
+if __name__ == "__main__":
+    target = input("Enter the target URL or file path for URL list: ")
+    run_all = input("Do you want to run all scanners together? (y/n): ").lower()
+
+    # If the target is a file (list of URLs or subdomains)
+    if os.path.isfile(target):
+        if run_all == 'y':
+            scan_from_list(target)
+        else:
+            print(f"{Colors.FAIL}Please select individual tools to run for each target in the list.{Colors.ENDC}")
+    # If the target is a single URL
+    else:
+        if run_all == 'y':
+            scan_target(target)
+        else:
+            while True:
+                print("\nSelect which tool to run:")
+                print("1. XSStrike")
+                print("2. BruteXSS")
+                print("3. XSSer")
+                print("4. Cyclops")
+                print("5. WhatWaf (Detect WAF)")
+                print("6. XWAF (Attempt WAF Bypass)")
+                print("7. Nemesida WAF Bypass")
+                print("8. Google Dork Recon")
+                print("9. Exit")
+
+                choice = input("Enter your choice (1-9): ")
+                
+                if choice == '1':
+                    run_xsstrike(target)
+                elif choice == '2':
+                    run_brutexss(target)
+                elif choice == '3':
+                    run_xsser(target)
+                elif choice == '4':
+                    run_cyclops(target)
+                elif choice == '5':
+                    run_whatwaf(target)
+                elif choice == '6':
+                    run_xwaf(target)
+                elif choice == '7':
+                    run_nemesida_bypass(target)
+                elif choice == '8':
+                    google_dork_recon(target)
+                elif choice == '9':
+                    print(f"Completed scanning {target}. Report saved in {report_path}")
+                    break
+                else:
+                    print(f"{Colors.FAIL}Invalid choice. Please select again.{Colors.ENDC}")
